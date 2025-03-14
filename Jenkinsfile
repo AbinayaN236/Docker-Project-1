@@ -1,59 +1,75 @@
 pipeline {
+    agent any
+    
+    environment {
+        registry = "529088272063.dkr.ecr.us-west-2.amazonaws.com/docker-project-repo"
+        python_image_tag = "python-image"
+        sql_image_tag = "sql-image"
+    }
 
-  environment {
-    registry = "10.128.15.208:5000/mgsgoms/flask"
-    registry_mysql = "10.128.15.208:5000/mgsgoms/mysql"
-    dockerImage = ""
-  }
-
-  agent any
     stages {
-  
-    stage('Checkout Source') {
-      steps {
-        git 'https://github.com/mgsgoms/Docker-Project.git'
-      }
-    }
-
-    stage('Build image') {
-      steps{
-        script {
-          dockerImage = docker.build registry + ":$BUILD_NUMBER"
+        stage('Checkout') {
+            steps {
+                git branch: 'master', url: 'https://github.com/sakshara-github/vanakkam-world.git'
+            }
         }
-      }
-    }
 
-    stage('Push Image') {
-      steps{
-        script {
-          docker.withRegistry( "" ) {
-            dockerImage.push()
-          }
+        stage('Building Python image') {
+            steps {
+                script {
+                    // Build Python Docker image
+                    dockerImage = docker.build("${registry}:${python_image_tag}", "-f Dockerfile.python .")
+                }
+            }
         }
-      }
-    }
 
-    stage('current') {
-      steps{
-        dir("${env.WORKSPACE}/mysql"){
-          sh "pwd"
-          }
-      }
-   }
-   stage('Build mysql image') {
-     steps{
-       sh 'docker build -t "10.128.15.208:5000/mgsgoms/mysql:$BUILD_NUMBER"  "$WORKSPACE"/mysql'
-        sh 'docker push "10.128.15.208:5000/mgsgoms/mysql:$BUILD_NUMBER"'
+        stage('Building SQL image') {
+            steps {
+                script {
+                    // Build SQL Docker image
+                    dockerImage = docker.build("${registry}:${sql_image_tag}", "-f Dockerfile.sql .")
+                }
+            }
         }
-      }
-    stage('Deploy App') {
-      steps {
-        script {
-          kubernetesDeploy(configs: "frontend.yaml", kubeconfigId: "kube")
+
+        stage('Pushing to ECR') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-docker', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                        // Log in to ECR
+                        sh 'aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 529088272063.dkr.ecr.us-west-2.amazonaws.com'
+                        
+                        // Push both Python and SQL images to ECR
+                        sh 'docker push 529088272063.dkr.ecr.us-west-2.amazonaws.com/docker-project-repo:python-image'
+                        sh 'docker push 529088272063.dkr.ecr.us-west-2.amazonaws.com/docker-project-repo:sql-image'
+                    }
+                }
+            }
         }
-      }
+
+        stage('Stop previous containers') {
+            steps {
+                sh 'docker ps -f name=Container -q | xargs --no-run-if-empty docker container stop'
+                sh 'docker container ls -a -fname=Container -q | xargs -r docker container rm'
+            }
+        }
+
+        stage('Docker Run Python') {
+            steps {
+                script {
+                    // Run the Python container
+                    sh 'docker run -d -p 9096:8080 --rm --name mypythonContainer 529088272063.dkr.ecr.us-west-2.amazonaws.com/docker-project-repo:python-image'
+                }
+            }
+        }
+
+        stage('Docker Run SQL') {
+            steps {
+                script {
+                    // Run the SQL container
+                    sh 'docker run -d -p 9097:8080 --rm --name mysqlContainer 529088272063.dkr.ecr.us-west-2.amazonaws.com/docker-project-repo:sql-image'
+                }
+            }
+        }
     }
-
-  }
-
 }
