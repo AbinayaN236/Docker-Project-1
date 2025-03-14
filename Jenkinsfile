@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/sakshara-github/vanakkam-world.git'
+                git branch: 'master', url: 'https://github.com/sakshara-github/Docker-Project-1.git'
             }
         }
 
@@ -67,7 +67,7 @@ pipeline {
             steps {
                 script {
                     // Run the SQL container
-                    sh 'docker run -d -p 9097:8080 --rm --name mysqlContainer 529088272063.dkr.ecr.us-west-2.amazonaws.com/docker-project-repo:sql-image'
+                    sh 'docker run -d -p 9097:3306 --rm --name mysqlContainer 529088272063.dkr.ecr.us-west-2.amazonaws.com/docker-project-repo:sql-image'
                 }
             }
         }
