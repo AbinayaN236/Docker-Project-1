@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask
+spec:
+  selector:
+    matchLabels:
+      app: flask
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: flask
+    spec:
+      containers:
+      - name: flask
+        image: abinayanatarajan236/image-123:tag
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MYSQL_HOST
+          value: "backend"
+        - name: MYSQL_USER
+          value: "root"
+        - name: MYSQL_PASSWORD
+          value: "1nd1a"
+        - name: MYSQL_DATABASE
+          value: "MYUsers"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-service
+spec:
+  selector:
+    app: flask
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30000
